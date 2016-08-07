@@ -1,5 +1,4 @@
 #include <windows.h>
-#include <Shlobj.h>
 #include "RTSSSharedMemory.h"
 #pragma comment(linker, "/SUBSYSTEM:WINDOWS")
 #pragma comment(linker, "/NODEFAULTLIB")
