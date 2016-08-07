@@ -15,7 +15,7 @@ void UpdateOSDEx(LPCSTR lpText, const LPRTSS_SHARED_MEMORY pMem, char *OSD);
 
 void WinMainCRTStartup()
 {
-	LPCTSTR pClassName = TEXT("My Default Browser");
+	LPCTSTR pClassName = TEXT("RTSS_Timer");
 	HINSTANCE hinst;
 	MSG msg;
 	HWND hwnd;
@@ -39,7 +39,7 @@ void WinMainCRTStartup()
 
 	if (!RegisterClassEx(&wc)) return;
 
-	hwnd = CreateWindow(pClassName, TEXT("RTSS_Timer"),
+	hwnd = CreateWindow(pClassName, TEXT("Timer for RTSS"),
 		WS_OVERLAPPEDWINDOW,
 		CW_USEDEFAULT, CW_USEDEFAULT,
 		300, GetSystemMetrics(SM_CYMIN) + 26,
@@ -72,19 +72,18 @@ DWORD WINAPI ThreadProc(LPVOID lpParameter)
 	}
 	
 	char *OSD;
-	SecureZeroMemory(&OSD, sizeof(OSD));
 	GetOSD(&OSD, pMem);
 	
 	DWORD st, dt;
 	TCHAR szTime[256];
 
-	UpdateOSDEx("00:00:00.00", pMem, OSD);
+	UpdateOSDEx("00:00:00.000", pMem, OSD);
 
 	while (TRUE) {
 		while (!GetAsyncKeyState(VK_DECIMAL)) {
 			Sleep(16);
 		}
-		st = timeGetTime();
+		st = timeGetTime(); // Ç±ÇÍà»è„ÇÃê∏ìxÇãÅÇﬂÇÈêlä‘ÇÕÇ¢Ç»Ç¢
 
 		do {
 			Sleep(16);
