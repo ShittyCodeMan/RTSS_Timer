@@ -4,10 +4,14 @@
 #pragma comment(linker, "/NODEFAULTLIB")
 #pragma comment(linker, "/INCREMENTAL:NO")
 
+#define UniqueMapName "RTSSSharedMemory_RTSS_Timer"
+
 LRESULT CALLBACK WindowProc(HWND, UINT, WPARAM, LPARAM);
 DWORD WINAPI ThreadProc(LPVOID lpParameter);
 BOOL UpdateOSD(LPCSTR lpText);
 void ReleaseOSD();
+BOOL GetOSD(char** Dest, LPRTSS_SHARED_MEMORY pMem);
+void UpdateOSDEx(LPCSTR lpText, const LPRTSS_SHARED_MEMORY pMem, char *OSD);
 
 void WinMainCRTStartup()
 {
@@ -53,10 +57,28 @@ void WinMainCRTStartup()
 
 DWORD WINAPI ThreadProc(LPVOID lpParameter)
 {
+	// hMapFile‚ÆpMapAddr•Â‚¶‚Ä‚È‚¢‚¯‚ÇOS‚ª‰½‚Æ‚©‚µ‚Ä‚­‚ê‚é‚Å‚µ‚å(“K“–)
+	HANDLE hMapFile = OpenFileMapping(FILE_MAP_ALL_ACCESS, FALSE, TEXT("RTSSSharedMemoryV2"));
+	if (NULL == hMapFile)
+	{
+		return 0;
+	}
+	LPVOID pMapAddr				= MapViewOfFile(hMapFile, FILE_MAP_ALL_ACCESS, 0, 0, 0);
+	LPRTSS_SHARED_MEMORY pMem	= (LPRTSS_SHARED_MEMORY)pMapAddr;
+	if (NULL == pMem)
+	{
+		CloseHandle(hMapFile);
+		return 0;
+	}
+	
+	char *OSD;
+	SecureZeroMemory(&OSD, sizeof(OSD));
+	GetOSD(&OSD, pMem);
+	
 	DWORD st, dt;
 	TCHAR szTime[256];
 
-	UpdateOSD("00:00:00.00");
+	UpdateOSDEx("00:00:00.00", pMem, OSD);
 
 	while (TRUE) {
 		while (!GetAsyncKeyState(VK_DECIMAL)) {
@@ -73,7 +95,7 @@ DWORD WINAPI ThreadProc(LPVOID lpParameter)
 				dt / 1000 % 60,
 				dt % 1000
 			);
-			UpdateOSD(szTime);
+			UpdateOSDEx(szTime, pMem, OSD);
 		} while (!GetAsyncKeyState(VK_NUMPAD0));
 
 		Sleep(16);
@@ -137,10 +159,10 @@ BOOL UpdateOSD(LPCSTR lpText)
 						if (dwPass)
 						{
 							if (!lstrlen(pEntry->szOSDOwner))
-								lstrcpy(pEntry->szOSDOwner, "RTSSSharedMemorySample");
+								lstrcpy(pEntry->szOSDOwner, UniqueMapName);
 						}
 
-						if (!lstrcmp(pEntry->szOSDOwner, "RTSSSharedMemorySample"))
+						if (!lstrcmp(pEntry->szOSDOwner, UniqueMapName))
 						{
 							if (pMem->dwVersion >= 0x00020007)
 								//use extended text slot for v2.7 and higher shared memory, it allows displaying 4096 symbols
@@ -190,7 +212,7 @@ void ReleaseOSD()
 				{
 					RTSS_SHARED_MEMORY::LPRTSS_SHARED_MEMORY_OSD_ENTRY pEntry = (RTSS_SHARED_MEMORY::LPRTSS_SHARED_MEMORY_OSD_ENTRY)((LPBYTE)pMem + pMem->dwOSDArrOffset + dwEntry * pMem->dwOSDEntrySize);
 
-					if (!lstrcmp(pEntry->szOSDOwner, "RTSSSharedMemorySample"))
+					if (!lstrcmp(pEntry->szOSDOwner, UniqueMapName))
 					{
 						SecureZeroMemory(pEntry, pMem->dwOSDEntrySize);
 						pMem->dwOSDFrame++;
@@ -203,4 +225,61 @@ void ReleaseOSD()
 
 		CloseHandle(hMapFile);
 	}
+}
+/////////////////////////////////////////////////////////////////////////////
+BOOL GetOSD(char** Dest, LPRTSS_SHARED_MEMORY pMem)
+{
+	BOOL bResult	= FALSE;
+
+	if (pMem)
+	{
+		if ((pMem->dwSignature == 'RTSS') && 
+			(pMem->dwVersion >= 0x00020000))
+		{
+			for (DWORD dwPass=0; dwPass<2; dwPass++)
+				//1st pass : find previously captured OSD slot
+				//2nd pass : otherwise find the first unused OSD slot and capture it
+			{
+				for (DWORD dwEntry=1; dwEntry<pMem->dwOSDArrSize; dwEntry++)
+					//allow primary OSD clients (i.e. EVGA Precision / MSI Afterburner) to use the first slot exclusively, so third party
+					//applications start scanning the slots from the second one
+				{
+					RTSS_SHARED_MEMORY::LPRTSS_SHARED_MEMORY_OSD_ENTRY pEntry = (RTSS_SHARED_MEMORY::LPRTSS_SHARED_MEMORY_OSD_ENTRY)((LPBYTE)pMem + pMem->dwOSDArrOffset + dwEntry * pMem->dwOSDEntrySize);
+
+					if (dwPass)
+					{
+						if (!lstrlen(pEntry->szOSDOwner))
+							lstrcpy(pEntry->szOSDOwner, UniqueMapName);
+					}
+
+					if (!lstrcmp(pEntry->szOSDOwner, UniqueMapName))
+					{
+						if (pMem->dwVersion >= 0x00020007)
+							//use extended text slot for v2.7 and higher shared memory, it allows displaying 4096 symbols
+							//instead of 256 for regular text slot
+							*Dest = pEntry->szOSDEx;
+						else
+							*Dest = pEntry->szOSD;
+
+						bResult = TRUE;
+
+						break;
+					}
+				}
+
+				if (bResult)
+					break;
+			}
+		}
+
+	}
+
+	return bResult;
+}
+/////////////////////////////////////////////////////////////////////////////
+void UpdateOSDEx(LPCSTR lpText, const LPRTSS_SHARED_MEMORY pMem, char *OSD)
+{
+	lstrcpyn(OSD, lpText, 255);
+	pMem->dwOSDFrame++;
+	FlushViewOfFile(pMem, 0);
 }
