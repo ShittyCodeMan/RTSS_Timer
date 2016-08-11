@@ -105,7 +105,7 @@ LRESULT CALLBACK WindowProc(HWND hwnd, UINT msg, WPARAM wp, LPARAM lp)
 {
 	switch (msg) {
 	case WM_DESTROY:
-		ReleaseOSD();
+		ReleaseOSDEx(param.hMapFile, param.pMem);
 		ExitProcess(0);
 		break;
 
@@ -288,9 +288,30 @@ BOOL GetOSD(char** Dest, LPRTSS_SHARED_MEMORY pMem)
 	return bResult;
 }
 /////////////////////////////////////////////////////////////////////////////
-void UpdateOSDEx(LPCSTR lpText, const LPRTSS_SHARED_MEMORY pMem, char *OSD)
+void UpdateOSDEx(LPCSTR lpText, LPRTSS_SHARED_MEMORY pMem, char *OSD)
 {
 	lstrcpyn(OSD, lpText, 255);
 	pMem->dwOSDFrame++;
 	FlushViewOfFile(pMem, 0);
+}
+/////////////////////////////////////////////////////////////////////////////
+void ReleaseOSDEx(HANDLE hMapFile, LPRTSS_SHARED_MEMORY pMem)
+{
+	if ((pMem->dwSignature == 'RTSS') && 
+		(pMem->dwVersion >= 0x00020000))
+	{
+		for (DWORD dwEntry=1; dwEntry<pMem->dwOSDArrSize; dwEntry++)
+		{
+			RTSS_SHARED_MEMORY::LPRTSS_SHARED_MEMORY_OSD_ENTRY pEntry = (RTSS_SHARED_MEMORY::LPRTSS_SHARED_MEMORY_OSD_ENTRY)((LPBYTE)pMem + pMem->dwOSDArrOffset + dwEntry * pMem->dwOSDEntrySize);
+
+			if (!lstrcmp(pEntry->szOSDOwner, UniqueMapName))
+			{
+				SecureZeroMemory(pEntry, pMem->dwOSDEntrySize);
+				pMem->dwOSDFrame++;
+			}
+		}
+	}
+
+	UnmapViewOfFile(pMapAddr);
+	CloseHandle(hMapFile);
 }
