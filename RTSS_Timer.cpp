@@ -6,8 +6,15 @@
 
 #define UniqueMapName "RTSSSharedMemory_RTSS_Timer"
 
+typedef struct {
+	HANDLE hMapFile;
+	LPRTSS_SHARED_MEMORY pMem;
+} THREAD_PARAM;
+
+THREAD_PARAM param;
+
 LRESULT CALLBACK WindowProc(HWND, UINT, WPARAM, LPARAM);
-DWORD WINAPI ThreadProc(LPVOID lpParameter);
+DWORD WINAPI ThreadProc(LPVOID param);
 BOOL UpdateOSD(LPCSTR lpText);
 void ReleaseOSD();
 BOOL GetOSD(char** Dest, LPRTSS_SHARED_MEMORY pMem);
@@ -55,22 +62,10 @@ void WinMainCRTStartup()
 	return;
 }
 
-DWORD WINAPI ThreadProc(LPVOID lpParameter)
+DWORD WINAPI ThreadProc(LPVOID param)
 {
-	// hMapFile‚ÆpMapAddr•Â‚¶‚Ä‚È‚¢‚¯‚ÇOS‚ª‰½‚Æ‚©‚µ‚Ä‚­‚ê‚é‚Å‚µ‚å(“K“–)
-	HANDLE hMapFile = OpenFileMapping(FILE_MAP_ALL_ACCESS, FALSE, TEXT("RTSSSharedMemoryV2"));
-	if (NULL == hMapFile)
-	{
-		return 0;
-	}
-	LPVOID pMapAddr				= MapViewOfFile(hMapFile, FILE_MAP_ALL_ACCESS, 0, 0, 0);
-	LPRTSS_SHARED_MEMORY pMem	= (LPRTSS_SHARED_MEMORY)pMapAddr;
-	if (NULL == pMem)
-	{
-		CloseHandle(hMapFile);
-		return 0;
-	}
-	
+	HANDLE hMapFile = ((THREAD_PARAM*)param)->hMapFile;
+	LPRTSS_SHARED_MEMORY pMem = ((THREAD_PARAM*)param)->pMem;
 	char *OSD;
 	GetOSD(&OSD, pMem);
 	
@@ -122,9 +117,21 @@ LRESULT CALLBACK WindowProc(HWND hwnd, UINT msg, WPARAM wp, LPARAM lp)
 			hwnd, (HMENU)1,
 			((LPCREATESTRUCT)(lp))->hInstance, NULL
 		);
-
+		
+		param.hMapFile = OpenFileMapping(FILE_MAP_ALL_ACCESS, FALSE, TEXT("RTSSSharedMemoryV2"));
+		if (NULL == param.hMapFile)
+		{
+			return 0;
+		}
+		param.pMem = (LPRTSS_SHARED_MEMORY)MapViewOfFile(param.hMapFile, FILE_MAP_ALL_ACCESS, 0, 0, 0);
+		if (NULL == param.pMem)
+		{
+			CloseHandle(param.hMapFile);
+			return 0;
+		}
+		
 		DWORD dwThreadId;
-		CreateThread(NULL, 0, ThreadProc, NULL, 0, &dwThreadId);
+		CreateThread(NULL, 0, ThreadProc, (void*)&param, 0, &dwThreadId);
 		break;
 
 	default:
