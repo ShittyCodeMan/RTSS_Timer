@@ -77,10 +77,10 @@ DWORD WINAPI ThreadProc(LPVOID lpParameter)
 	DWORD st, dt;
 	TCHAR szTime[256];
 
-	UpdateOSDEx("00:00:00.000", pMem, OSD);
-
 	while (TRUE) {
-		while (!GetAsyncKeyState(VK_DECIMAL)) {
+		UpdateOSDEx("00:00:00.000", pMem, OSD);
+		
+		while (!GetAsyncKeyState(VK_DECIMAL) || GetAsyncKeyState(VK_NUMPAD0)) {
 			Sleep(16);
 		}
 		st = timeGetTime(); // Ç±ÇÍà»è„ÇÃê∏ìxÇãÅÇﬂÇÈêlä‘ÇÕÇ¢Ç»Ç¢
@@ -95,9 +95,14 @@ DWORD WINAPI ThreadProc(LPVOID lpParameter)
 				dt % 1000
 			);
 			UpdateOSDEx(szTime, pMem, OSD);
-		} while (!GetAsyncKeyState(VK_NUMPAD0));
-
-		Sleep(16);
+		} while (!GetAsyncKeyState(VK_NUMPAD0) || GetAsyncKeyState(VK_DECIMAL));
+		
+		while (!GetAsyncKeyState(VK_DECIMAL) || !GetAsyncKeyState(VK_NUMPAD0)) {
+			Sleep(16);
+		}
+		
+		UpdateOSDEx("--:--:--.---", pMem, OSD);
+		Sleep(500);
 	}
 }
 
