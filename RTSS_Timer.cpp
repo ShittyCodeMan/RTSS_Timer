@@ -19,6 +19,7 @@ BOOL UpdateOSD(LPCSTR lpText);
 void ReleaseOSD();
 BOOL GetOSD(char** Dest, LPRTSS_SHARED_MEMORY pMem);
 void UpdateOSDEx(LPCSTR lpText, const LPRTSS_SHARED_MEMORY pMem, char *OSD);
+void ReleaseOSDEx(HANDLE hMapFile, LPRTSS_SHARED_MEMORY pMem);
 
 void WinMainCRTStartup()
 {
@@ -312,6 +313,6 @@ void ReleaseOSDEx(HANDLE hMapFile, LPRTSS_SHARED_MEMORY pMem)
 		}
 	}
 
-	UnmapViewOfFile(pMapAddr);
+	UnmapViewOfFile(pMem);
 	CloseHandle(hMapFile);
 }
